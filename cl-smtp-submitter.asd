@@ -20,6 +20,9 @@
   :licence "GNU Lesser General Public Licence 3.0"
   :author "Thomas Bakketun <thomas.bakketun@copyleft.no>"
   :description "A library for sending email via SMTP according to RFC 6409."
-  :depends-on ()
+  :depends-on (:cl-base64
+               :cl+ssl
+               :usocket)
   :serial t
-  :components ((:file "package")))
+  :components ((:file "package")
+               (:file "client")))

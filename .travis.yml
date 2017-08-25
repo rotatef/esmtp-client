@@ -13,4 +13,4 @@ install:
   - curl -L https://github.com/luismbo/cl-travis/raw/master/install.sh | sh
 
 script:
-  - cl -e "(ql:quickload :cl-smtp-submitter)"
+  - cl -e "(ql:quickload :cl-smtp-submitter-tests) (cl-smtp-submitter-tests:run)"

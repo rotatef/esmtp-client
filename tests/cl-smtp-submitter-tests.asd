@@ -15,8 +15,12 @@
 ;;;;  You should have received a copy of the GNU General Public License
 ;;;;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-(defpackage #:cl-smtp-submitter
-  (:nicknames #:smtp)
-  (:use :common-lisp)
-  (:export
-   ))
+(defsystem #:cl-smtp-submitter-tests
+  :name "cl-smtp-submitter-tests"
+  :licence "GNU Lesser General Public Licence 3.0"
+  :author "Thomas Bakketun <thomas.bakketun@copyleft.no>"
+  :description "Tests for cl-stmp-submitter"
+  :depends-on (:cl-smtp-submitter)
+  :serial t
+  :components ((:file "package")
+               (:file "tests")))
