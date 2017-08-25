@@ -1,0 +1,15 @@
+language: lisp
+
+branches:
+  only:
+    - master
+
+env:
+  matrix:
+    - LISP=sbcl
+
+install:
+  - curl -L https://github.com/luismbo/cl-travis/raw/master/install.sh | sh
+
+script:
+  - cl -e "(ql:quickload :cl-smtp-submitter)"
