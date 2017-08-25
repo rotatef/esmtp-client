@@ -17,7 +17,7 @@
 
 (defsystem #:cl-smtp-submitter
   :name "cl-smtp-submitter"
-  :licence "GNU General Public Licence 3.0"
+  :licence "GNU Lesser General Public Licence 3.0"
   :author "Thomas Bakketun <thomas.bakketun@copyleft.no>"
   :description "A library for sending email via SMTP according to RFC 6409."
   :depends-on ()
