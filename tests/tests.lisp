@@ -19,7 +19,7 @@
 
 
 (defun talk-to-smtp-server (&key client mail-from rcpt-to data)
-  (smtp::with-session (client :trace *trace-output*)
+  (esmtp::with-session (client :trace *trace-output*)
     (esmtp::mail-from mail-from)
     (esmtp::rcpt-to rcpt-to)
     (when data
