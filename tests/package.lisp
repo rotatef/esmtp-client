@@ -20,4 +20,5 @@
    :common-lisp
    :cl-esmtp-client)
   (:export
-   :run))
+   :run
+   :travis-run))
