@@ -71,7 +71,8 @@ Hello World.")))
                         :trace *trace-output*)
     (esmtp::send-command 250 "NOOP")
     (esmtp::send-command 250 "RSET")
-    (esmtp::send-command 252 "VRFY postmaster")))
+    (esmtp::send-command 252 "VRFY postmaster")
+    (esmtp::extensions esmtp::*session*)))
 
 
 (defun run ()

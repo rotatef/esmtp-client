@@ -62,9 +62,6 @@
    (ssl-options :initarg :ssl-options
                 :reader ssl-options
                 :initform nil)
-   (auth-method :initarg :auth-method
-                :reader auth-method
-                :initform nil)
    (credentials :initarg :credentials
                 :reader credentials
                 :initform nil)
@@ -77,10 +74,7 @@
   (declare (ignore args))
   (assert (slot-boundp client 'host) () "SMTP host name missing.")
   (unless (slot-boundp client 'port)
-    (setf (slot-value client 'port) (if (ssl client) 465 587)))
-  (when (credentials client)
-    (unless (auth-method client)
-      (setf (slot-value client 'auth-method) :plain))))
+    (setf (slot-value client 'port) (if (ssl client) 465 587))))
 
 
 
@@ -94,9 +88,7 @@
                 :accessor text-stream)
    (greeting :accessor greeting)
    (hello-greeting :accessor hello-greeting)
-   (features :accessor features
-             :initform nil)
-   (max-size :accessor max-size
+   (extensions :accessor extensions
              :initform nil)
    (trace-stream :initarg :trace-stream
                  :accessor trace-stream)
@@ -168,8 +160,8 @@
   (tls-stream *session*))
 
 
-(defun feature (feature)
-  (assoc feature (features *session*)))
+(defun extensionp (extension)
+  (assoc extension (extensions *session*)))
 
 
 (defun read-reply ()
@@ -236,25 +228,31 @@
   (send-command 221 "QUIT"))
 
 
-(defun parse-feature (feature)
-  (let ((name-end (position #\Space feature)))
-    (cons (intern (string-upcase (subseq feature 0 name-end)) :keyword)
-          (when name-end
-            (subseq feature (1+ name-end))))))
-
-
-(defun register-feature (feature)
-  (case (car feature)
-    (:size
-     (when (cdr feature)
-       (setf (max-size *session*) (parse-integer (cdr feature)))))))
+(defun parse-ehlo-line (line)
+  (destructuring-bind (keyword . params)
+      (loop for start = 0 then (1+ end)
+            while (< start (length line))
+            for next-space = (position #\Space line :start start)
+            for end = (or next-space (length line))
+            when (< 0 (- end start))
+              collect (subseq line start end))
+    (let ((keyword (intern (string-upcase keyword) :keyword)))
+      (cons keyword
+            (case keyword
+              (:size
+               (when params
+                 (parse-integer (car params))))
+              (:auth
+               (loop for param in params collect (intern (string-upcase param) :keyword)))
+              (otherwise
+               params))))))
 
 
 (defun ehlo ()
-  (multiple-value-bind (ehlo-greeting features)
+  (multiple-value-bind (ehlo-greeting ehlo-lines)
       (send-command 250 "EHLO ~A" (local-name (client *session*)))
     (setf (hello-greeting *session*) ehlo-greeting)
-    (setf (features *session*) (mapcar #'parse-feature features))))
+    (setf (extensions *session*) (mapcar #'parse-ehlo-line ehlo-lines))))
 
 
 (defun helo ()
@@ -269,8 +267,8 @@
 
 
 (defun starttls ()
-  (when (and (not (secure-connection-p))
-             (feature :starttls))
+  (when (and (extensionp :starttls)
+             (not (secure-connection-p)))
     (send-command 220 "STARTTLS")
     (make-connection-secure)
     (ehlo-or-helo)))
@@ -279,7 +277,7 @@
 (defun mail-from (address &key size)
   (send-command 250 "MAIL FROM:<~A>~@[ SIZE=~D~]"
                 address
-                (when (feature :size) size)))
+                (when (extensionp :size) size)))
 
 
 (defun rcpt-to (address)
@@ -292,14 +290,17 @@
 
 
 (defun authenticate ()
-  (let ((auth-method (auth-method (client *session*))))
-    (when auth-method
+  (when (credentials (client *session*))
+    (let* ((supported-mechanisms '(:plain :login))
+           (usable-mechanisms (intersection supported-mechanisms (extensionp :auth))))
+      (unless usable-mechanisms
+        (error "Unable to authentciate, no common supported mechanism.~%Client supports: ~S~%Server supports: ~S"
+               supported-mechanisms (extensionp :auth)))
       (assert (secure-connection-p) () "Connection is not secure. Refusing to send password.")
-      (ecase auth-method
-        (:plain
-         (auth-plain))
-        (:login
-         (auth-login))))))
+      (cond ((member :plain usable-mechanisms)
+             (auth-plain))
+            ((member :login usable-mechanisms)
+             (auth-login))))))
 
 
 (defun unwrap-secret (secret)
