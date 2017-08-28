@@ -31,7 +31,7 @@
 (defun talk-to-test.smtp.org ()
   (talk-to-smtp-server :client (make-instance 'esmtp::client
                                               :host "test.smtp.org"
-                                              :ssl-options '(:verify nil)
+                                              :cl+ssl-options '(:verify nil)
                                               :credentials '("user16" "pass16"))
                        :mail-from ""
                        :rcpt-to "bit-bucket"
@@ -80,7 +80,7 @@ Hello World.")))
   (esmtp::with-session ((make-instance 'esmtp::client
                                        :host "localhost"
                                        :port 2525)
-                        :trace *trace-output*)
+                        :trace t)
     (esmtp::mail-from "me@example.com")
     (esmtp::rcpt-to "you@example.com")
     (esmtp::data '("From: Me <me@example.com>"

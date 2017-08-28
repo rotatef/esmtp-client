@@ -59,9 +59,9 @@
    (ssl :initarg :ssl
         :reader ssl
         :initform nil)
-   (ssl-options :initarg :ssl-options
-                :reader ssl-options
-                :initform nil)
+   (cl+ssl-options :initarg :cl+ssl-options
+                   :reader cl+ssl-options
+                   :initform nil)
    (credentials :initarg :credentials
                 :reader credentials
                 :initform nil)
@@ -151,7 +151,9 @@
 (defun make-connection-secure ()
   (setf (tls-stream *session*) (apply #'cl+ssl:make-ssl-client-stream
                                       (cl+ssl:stream-fd (binary-stream *session*))
-                                      (ssl-options (client *session*))))
+                                      `(,@(cl+ssl-options (client *session*))
+                                        :hostname ,(host (client *session*))
+                                        :verify :required)))
   (trace-log :i "TLS negotiation complete")
   (setup-text-stream))
 
