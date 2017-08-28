@@ -32,8 +32,7 @@
   (talk-to-smtp-server :client (make-instance 'esmtp::client
                                               :host "test.smtp.org"
                                               :ssl-options '(:verify nil)
-                                              :username "user16"
-                                              :password "pass16")
+                                              :credentials '("user16" "pass16"))
                        :mail-from ""
                        :rcpt-to "bit-bucket"
                        :data (flex:string-to-octets
@@ -44,13 +43,25 @@ Subject: Test
 Hello World.")))
 
 
+(defvar *mailtrap.io-credentials*
+  ;; All mail sent using these credentials are discarded by mailtrap.io.
+  ;; Exposing them is unlikely to allow for any misuse.
+  (list "479a48b137b928"
+        (lambda () "3d7550496f7a14")))
+
 (defun talk-to-mailtrap.io ()
   (esmtp::with-session ((make-instance 'esmtp::client
                                        :host "smtp.mailtrap.io"
-                                       :port 2525)
+                                       :port 2525
+                                       :credentials *mailtrap.io-credentials*)
                         :trace *trace-output*)
-    (esmtp::send-command 250 "NOOP")
-    (esmtp::send-command 250 "RSET")))
+    (esmtp::mail-from "me@example.com")
+    (esmtp::rcpt-to "you@example.com")
+    (esmtp::data '("From: Me <me@example.com>"
+                   "To: You <you@example.com>"
+                   "Subject: Test"
+                   ""
+                   "Hello World."))))
 
 
 (defun talk-to-gmail.com ()

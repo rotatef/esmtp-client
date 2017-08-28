@@ -65,10 +65,9 @@
    (auth-method :initarg :auth-method
                 :reader auth-method
                 :initform nil)
-   (username :initarg :username
-             :reader username)
-   (password :initarg :password
-             :reader password)
+   (credentials :initarg :credentials
+                :reader credentials
+                :initform nil)
    (local-name :initarg :local-name
                :reader local-name
                :initform (machine-instance))))
@@ -79,10 +78,9 @@
   (assert (slot-boundp client 'host) () "SMTP host name missing.")
   (unless (slot-boundp client 'port)
     (setf (slot-value client 'port) (if (ssl client) 465 587)))
-  (when (and (slot-boundp client 'username)
-             (username client))
+  (when (credentials client)
     (unless (auth-method client)
-      (setf (slot-value client 'auth-method) :login))))
+      (setf (slot-value client 'auth-method) :plain))))
 
 
 
@@ -299,28 +297,40 @@
       (assert (secure-connection-p) () "Connection is not secure. Refusing to send password.")
       (ecase auth-method
         (:plain
-         (auth-plain (username (client *session*)) (password (client *session*))))
+         (auth-plain))
         (:login
-         (auth-login (username (client *session*)) (password (client *session*))))))))
+         (auth-login))))))
 
 
-(defun auth-plain (username password)
-  (let ((*suppress-trace-column* 11))
-    (send-command 235 "AUTH PLAIN ~A"
-                  (string-to-utf8-base64
-                   (format nil "~A~C~A~C~A"
-                           username
-                           #\null
-                           username
-                           #\null
-                           password)))))
+(defun unwrap-secret (secret)
+  (if (functionp secret)
+      (funcall secret)
+      secret))
 
 
-(defun auth-login (username password)
-  (send-command 334 "AUTH LOGIN")
-  (let ((*suppress-trace-column* 0))
-    (send-command 334 (string-to-utf8-base64 username))
-    (send-command 235 (string-to-utf8-base64 password))))
+(defun auth-plain ()
+  (let* ((credentials (unwrap-secret (credentials (client *session*))))
+         (username (unwrap-secret (first credentials)))
+         (password (unwrap-secret (second credentials))))
+    (let ((*suppress-trace-column* 11))
+      (send-command 235 "AUTH PLAIN ~A"
+                    (string-to-utf8-base64
+                     (format nil "~A~C~A~C~A"
+                             username
+                             #\null
+                             username
+                             #\null
+                             password))))))
+
+
+(defun auth-login ()
+  (let* ((credentials (unwrap-secret (credentials (client *session*))))
+         (username (unwrap-secret (first credentials)))
+         (password (unwrap-secret (second credentials))))
+    (send-command 334 "AUTH LOGIN")
+    (let ((*suppress-trace-column* 0))
+      (send-command 334 (string-to-utf8-base64 username))
+      (send-command 235 (string-to-utf8-base64 password)))))
 
 
 (defun data-start ()
