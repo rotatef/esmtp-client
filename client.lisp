@@ -78,7 +78,7 @@
   (declare (ignore args))
   (assert (slot-boundp client 'host) () "SMTP host name missing.")
   (unless (slot-boundp client 'port)
-    (setf (slot-value client 'port) (if (ssl client) 465 25)))
+    (setf (slot-value client 'port) (if (ssl client) 465 587)))
   (when (and (slot-boundp client 'username)
              (username client))
     (unless (auth-method client)
