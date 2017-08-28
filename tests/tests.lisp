@@ -44,5 +44,31 @@ Subject: Test
 Hello World.")))
 
 
+(defun talk-to-mailtrap.io ()
+  (esmtp::with-session ((make-instance 'esmtp::client
+                                       :host "smtp.mailtrap.io"
+                                       :port 2525)
+                        :trace *trace-output*)
+    (esmtp::send-command 250 "NOOP")
+    (esmtp::send-command 250 "RSET")))
+
+
+(defun talk-to-gmail.com ()
+  (esmtp::with-session ((make-instance 'esmtp::client
+                                       :host "smtp.gmail.com"
+                                       :ssl t)
+                        :trace *trace-output*)
+    (esmtp::send-command 250 "NOOP")
+    (esmtp::send-command 250 "RSET")
+    (esmtp::send-command 252 "VRFY postmaster")))
+
+
 (defun run ()
-  (talk-to-test.smtp.org))
+  (talk-to-test.smtp.org)
+  (talk-to-mailtrap.io)
+  (talk-to-gmail.com))
+
+
+(defun travis-run ()
+  (talk-to-mailtrap.io)
+  (talk-to-gmail.com))

@@ -13,4 +13,4 @@ install:
   - curl -L https://github.com/luismbo/cl-travis/raw/master/install.sh | sh
 
 script:
-  - cl -e "(ql:quickload :cl-esmtp-client-tests) (cl-esmtp-client-tests:run)"
+  - cl -e "(ql:quickload :cl-esmtp-client-tests) (cl-esmtp-client-tests:travis-run)"
