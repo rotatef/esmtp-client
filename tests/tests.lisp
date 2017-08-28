@@ -31,7 +31,6 @@
 (defun talk-to-test.smtp.org ()
   (talk-to-smtp-server :client (make-instance 'esmtp::client
                                               :host "test.smtp.org"
-                                              :port 587
                                               :ssl-options '(:verify nil)
                                               :username "user16"
                                               :password "pass16")
