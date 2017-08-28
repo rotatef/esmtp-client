@@ -75,6 +75,21 @@ Hello World.")))
     (esmtp::extensions esmtp::*session*)))
 
 
+;; python -m smtpd -n -c DebuggingServer localhost:2525
+(defun talk-to-local-python ()
+  (esmtp::with-session ((make-instance 'esmtp::client
+                                       :host "localhost"
+                                       :port 2525)
+                        :trace *trace-output*)
+    (esmtp::mail-from "me@example.com")
+    (esmtp::rcpt-to "you@example.com")
+    (esmtp::data '("From: Me <me@example.com>"
+                   "To: You <you@example.com>"
+                   "Subject: Test"
+                   ""
+                   "Hello World."))))
+
+
 (defun run ()
   (talk-to-test.smtp.org)
   (talk-to-mailtrap.io)

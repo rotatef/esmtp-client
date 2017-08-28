@@ -261,9 +261,12 @@
 
 
 (defun ehlo-or-helo ()
-  (handler-case (ehlo)
-    (protocol-error ()
-      (helo))))
+  (handler-bind ((permanent-error
+                   (lambda (e)
+                     (when (= 50 (floor (reply-code e) 10))
+                       (return-from ehlo-or-helo
+                         (helo))))))
+    (ehlo)))
 
 
 (defun starttls ()
