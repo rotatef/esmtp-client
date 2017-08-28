@@ -1,4 +1,4 @@
-;;;;  cl-smtp-submitter
+;;;;  cl-esmtp-client
 ;;;;
 ;;;;  Copyright (C) 2017 Thomas Bakketun <thomas.bakketun@copyleft.no>
 ;;;;
@@ -15,7 +15,7 @@
 ;;;;  You should have received a copy of the GNU General Public License
 ;;;;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-smtp-submitter-tests)
+(in-package #:cl-esmtp-client-tests)
 
 
 (defun talk-to-smtp-server (&key client mail-from rcpt-to data)

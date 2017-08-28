@@ -1,4 +1,4 @@
-;;;;  cl-smtp-submitter
+;;;;  cl-esmtp-client
 ;;;;
 ;;;;  Copyright (C) 2017 Thomas Bakketun <thomas.bakketun@copyleft.no>
 ;;;;
@@ -15,14 +15,12 @@
 ;;;;  You should have received a copy of the GNU General Public License
 ;;;;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-(defsystem #:cl-smtp-submitter
-  :name "cl-smtp-submitter"
+(defsystem #:cl-esmtp-client-tests
+  :name "cl-esmtp-client-tests"
   :licence "GNU Lesser General Public Licence 3.0"
   :author "Thomas Bakketun <thomas.bakketun@copyleft.no>"
-  :description "A library for sending email via SMTP according to RFC 6409."
-  :depends-on (:cl-base64
-               :cl+ssl
-               :usocket)
+  :description "Tests for cl-stmp-submitter"
+  :depends-on (:cl-esmtp-client)
   :serial t
   :components ((:file "package")
-               (:file "client")))
+               (:file "tests")))

@@ -1,4 +1,4 @@
-;;;;  cl-smtp-submitter
+;;;;  cl-esmtp-client
 ;;;;
 ;;;;  Copyright (C) 2017 Thomas Bakketun <thomas.bakketun@copyleft.no>
 ;;;;
@@ -16,7 +16,7 @@
 ;;;;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 
-(in-package #:cl-smtp-submitter)
+(in-package #:cl-esmtp-client)
 
 
 (defvar *session*)

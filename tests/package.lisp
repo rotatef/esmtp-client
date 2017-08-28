@@ -1,4 +1,4 @@
-;;;;  cl-smtp-submitter
+;;;;  cl-esmtp-client
 ;;;;
 ;;;;  Copyright (C) 2017 Thomas Bakketun <thomas.bakketun@copyleft.no>
 ;;;;
@@ -15,9 +15,9 @@
 ;;;;  You should have received a copy of the GNU General Public License
 ;;;;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-(defpackage #:cl-smtp-submitter-tests
+(defpackage #:cl-esmtp-client-tests
   (:use
    :common-lisp
-   :cl-smtp-submitter)
+   :cl-esmtp-client)
   (:export
    :run))
