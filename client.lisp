@@ -90,8 +90,8 @@
    (hello-greeting :accessor hello-greeting)
    (extensions :accessor extensions
              :initform nil)
-   (trace-stream :initarg :trace-stream
-                 :accessor trace-stream)
+   (trace-function :initarg :trace-function
+                   :accessor trace-function)
    (at-newline :initform t
                :accessor at-newline)
    (data-lines-count :accessor data-lines-count)
@@ -99,12 +99,19 @@
 
 
 (defvar *suppress-trace-column* nil)
-(defun trace-log (prefix data)
-  (when (trace-stream *session*)
+(defun trace-log (origin data)
+  (when (trace-function *session*)
     (when *suppress-trace-column*
       (setf data (fill (copy-seq data) #\* :start *suppress-trace-column*)))
-    (format (trace-stream *session*) "~&~:[ ~;*~]~A: ~A" (secure-connection-p) prefix data)
-    (finish-output (trace-stream *session*))))
+    (funcall (trace-function *session*) origin data)))
+
+
+(defun make-trace-to-stream (stream)
+  (lambda (origin data)
+    (if (eq :i origin)
+        (format stream "~&<~A>" data)
+        (format stream "~&~A: ~A" origin data))
+    (finish-output stream)))
 
 
 (defmacro with-session ((client &key trace) &body body)
@@ -119,7 +126,15 @@
                                       :element-type '(unsigned-byte 8))
     (let ((*session* (make-instance 'session
                                     :client client
-                                    :trace-stream trace)))
+                                    :trace-function (etypecase trace
+                                                      (stream
+                                                       (make-trace-to-stream trace))
+                                                      ((member t)
+                                                       (make-trace-to-stream *trace-output*))
+                                                      (function
+                                                       trace)
+                                                      (null
+                                                       nil)))))
       (setup-session stream)
       (multiple-value-prog1 (funcall function)
         (quit)))))
@@ -137,6 +152,7 @@
   (setf (tls-stream *session*) (apply #'cl+ssl:make-ssl-client-stream
                                       (cl+ssl:stream-fd (binary-stream *session*))
                                       (ssl-options (client *session*))))
+  (trace-log :i "TLS negotiation complete")
   (setup-text-stream))
 
 
@@ -376,9 +392,9 @@
     (incf (data-lines-count *session*))
     (terpri (text-stream *session*))
     (incf (data-bytes-count *session*) 2))
-  (trace-log "-" (format nil "Data sent: ~A lines, ~A bytes."
-                         (data-lines-count *session*)
-                         (data-bytes-count *session*)))
+  (trace-log :i (format nil "Data sent: ~A lines, ~A bytes"
+                        (data-lines-count *session*)
+                        (data-bytes-count *session*)))
   (send-command 250 "."))
 
 
