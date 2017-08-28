@@ -19,22 +19,31 @@
 
 
 (defun talk-to-smtp-server (&key client mail-from rcpt-to data)
-  (smtp::with-session (client)
-    (smtp::mail-from mail-from)
-    (smtp::rcpt-to rcpt-to)
+  (smtp::with-session (client :trace *trace-output*)
+    (esmtp::mail-from mail-from)
+    (esmtp::rcpt-to rcpt-to)
     (when data
-      (smtp::data-start)
-      (smtp::data-bytes data)
-      (smtp::data-end))))
+      (esmtp::data-start)
+      (esmtp::data-bytes data)
+      (esmtp::data-end))))
 
 
-(defun talk-to-gmail ()
-  (talk-to-smtp-server :client (make-instance 'smtp::client
-                                              :host "smtp.gmail.com"
-                                              :port 465
-                                              :ssl t)
-                       :mail-from "thomas.bakketun@copyleft.no"
-                       :rcpt-to "postmaster@gmail.com"))
+(defun talk-to-test.smtp.org ()
+  (talk-to-smtp-server :client (make-instance 'esmtp::client
+                                              :host "test.smtp.org"
+                                              :port 587
+                                              :ssl-options '(:verify nil)
+                                              :username "user16"
+                                              :password "pass16")
+                       :mail-from ""
+                       :rcpt-to "bit-bucket"
+                       :data (flex:string-to-octets
+"From: Me <me@example.com>
+To: You <you@example.com>
+Subject: Test
+
+Hello World.")))
+
 
 (defun run ()
-  (talk-to-gmail))
+  (talk-to-test.smtp.org))

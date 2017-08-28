@@ -59,6 +59,9 @@
    (ssl :initarg :ssl
         :reader ssl
         :initform nil)
+   (ssl-options :initarg :ssl-options
+                :reader ssl-options
+                :initform nil)
    (auth-method :initarg :auth-method
                 :reader auth-method
                 :initform nil)
@@ -141,8 +144,9 @@
 
 
 (defun make-connection-secure ()
-  (setf (tls-stream *session*) (cl+ssl:make-ssl-client-stream ;; TODO: args
-                               (cl+ssl:stream-fd (binary-stream *session*))))
+  (setf (tls-stream *session*) (apply #'cl+ssl:make-ssl-client-stream
+                                      (cl+ssl:stream-fd (binary-stream *session*))
+                                      (ssl-options (client *session*))))
   (setup-text-stream))
 
 

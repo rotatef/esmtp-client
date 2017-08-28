@@ -16,7 +16,7 @@
 ;;;;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 (defpackage #:cl-esmtp-client
-  (:nicknames #:smtp)
+  (:nicknames #:esmtp)
   (:use :common-lisp)
   (:export
    ))
