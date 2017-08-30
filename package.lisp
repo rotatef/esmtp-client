@@ -19,4 +19,23 @@
   (:nicknames #:esmtp)
   (:use :common-lisp)
   (:export
+   #:extensionp
+   #:extensions
+   #:data
+   #:data-end
+   #:data-bytes
+   #:data-line
+   #:data-start
+   #:hello-greeting
+   #:greeting
+   #:mail-from
+   #:max-size
+   #:noop
+   #:permanent-error
+   #:protocol-error
+   #:rcpt-to
+   #:rset
+   #:send-command
+   #:transient-error
+   #:with-session
    ))

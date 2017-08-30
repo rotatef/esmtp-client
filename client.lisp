@@ -113,14 +113,29 @@
    (tls-stream :accessor tls-stream :initform nil)
    (text-stream :initarg :stream
                 :accessor text-stream)
-   (greeting :accessor greeting)
-   (hello-greeting :accessor hello-greeting)
-   (extensions :accessor extensions
-               :initform nil)
+   (greeting)
+   (hello-greeting)
+   (extensions :initform nil)
    (at-newline :initform t
                :accessor at-newline)
    (data-lines-count :accessor data-lines-count)
    (data-bytes-count :accessor data-bytes-count)))
+
+
+(defun greeting ()
+  (slot-value *session* 'greeting))
+
+
+(defun hello-greeting ()
+  (slot-value *session* 'hello-greeting))
+
+
+(defun extensions ()
+  (slot-value *session* 'extensions))
+
+
+(defun extensionp (extension)
+  (assoc extension (extensions)))
 
 
 (defun settings ()
@@ -196,10 +211,6 @@
   (tls-stream *session*))
 
 
-(defun extensionp (extension)
-  (assoc extension (extensions *session*)))
-
-
 (defun read-reply ()
   "Returns three values, reply code, first reply line, list with remaining lines."
   (values-list
@@ -252,16 +263,29 @@
   (let ((command (apply #'format nil format args)))
     (trace-log :c command)
     (send-to-server command)
-    (when expected-code
-      (check-reply command expected-code))))
+    (if expected-code
+        (check-reply command expected-code)
+        (read-reply))))
 
 
 (defun read-greeting ()
-  (setf (greeting *session*) (check-reply nil 220)))
+  (setf (slot-value *session* 'greeting) (check-reply nil 220)))
 
 
 (defun quit ()
   (send-command 221 "QUIT"))
+
+
+(defun noop ()
+  (send-command 250 "NOOP"))
+
+
+(defun rset ()
+  (send-command 250 "RSET"))
+
+
+(defun max-size ()
+  (cdr (extensionp :size)))
 
 
 (defun parse-ehlo-line (line)
@@ -287,12 +311,12 @@
 (defun ehlo ()
   (multiple-value-bind (ehlo-greeting ehlo-lines)
       (send-command 250 "EHLO ~A" (local-name (settings)))
-    (setf (hello-greeting *session*) ehlo-greeting)
-    (setf (extensions *session*) (mapcar #'parse-ehlo-line ehlo-lines))))
+    (setf (slot-value *session* 'hello-greeting) ehlo-greeting)
+    (setf (slot-value *session* 'extensions) (mapcar #'parse-ehlo-line ehlo-lines))))
 
 
 (defun helo ()
-  (setf (hello-greeting *session*)
+  (setf (slot-value *session* 'hello-greeting)
         (send-command 250 "HELO ~A" (local-name (settings)))))
 
 

@@ -17,8 +17,7 @@
 
 (defpackage #:cl-esmtp-client-tests
   (:use
-   :common-lisp
-   :cl-esmtp-client)
+   :common-lisp)
   (:export
    :run
    :travis-run))

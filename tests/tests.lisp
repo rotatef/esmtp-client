@@ -19,13 +19,13 @@
 
 
 (defun talk-to-smtp-server (&key settings mail-from rcpt-to data)
-  (esmtp::with-session settings
-    (esmtp::mail-from mail-from)
-    (esmtp::rcpt-to rcpt-to)
+  (esmtp:with-session settings
+    (esmtp:mail-from mail-from)
+    (esmtp:rcpt-to rcpt-to)
     (when data
-      (esmtp::data-start)
-      (esmtp::data-bytes data)
-      (esmtp::data-end))))
+      (esmtp:data-start)
+      (esmtp:data-bytes data)
+      (esmtp:data-end))))
 
 
 (defun talk-to-test.smtp.org ()
@@ -49,13 +49,13 @@ Hello World.")))
         (lambda () "3d7550496f7a14")))
 
 (defun talk-to-mailtrap.io ()
-  (esmtp::with-session (list :host "smtp.mailtrap.io"
+  (esmtp:with-session (list :host "smtp.mailtrap.io"
                              :port 2525
                              :credentials *mailtrap.io-credentials*
                              :trace *trace-output*)
-    (esmtp::mail-from "me@example.com")
-    (esmtp::rcpt-to "you@example.com")
-    (esmtp::data '("From: Me <me@example.com>"
+    (esmtp:mail-from "me@example.com")
+    (esmtp:rcpt-to "you@example.com")
+    (esmtp:data '("From: Me <me@example.com>"
                    "To: You <you@example.com>"
                    "Subject: Test"
                    ""
@@ -63,23 +63,28 @@ Hello World.")))
 
 
 (defun talk-to-gmail.com ()
-  (esmtp::with-session (list :host "smtp.gmail.com"
-                             :ssl t
-                             :trace *trace-output*)
-    (esmtp::send-command 250 "NOOP")
-    (esmtp::send-command 250 "RSET")
-    (esmtp::send-command 252 "VRFY postmaster")
-    (esmtp::extensions esmtp::*session*)))
+  (esmtp:with-session (list :host "smtp.gmail.com"
+                            :trace *trace-output*)
+    (esmtp:noop)
+    (esmtp:rset)
+    (format t "~&Verify reply: ~A" (esmtp:send-command 252 "VRFY postmaster"))
+    (format t "~&Initial greeting: ~A" (esmtp:greeting))
+    (format t "~&Hello greeting: ~A" (esmtp:hello-greeting))
+    (format t "~&Supported extentions: ~S" (esmtp:extensions))
+    (format t "~&Maximium message size: ~A" (esmtp:max-size))
+    (handler-case (esmtp:mail-from "me@example.com")
+      (esmtp:permanent-error (e)
+        (format t "~&======~&Got error as expected:~&~A~&======" e)))))
 
 
 ;; python -m smtpd -n -c DebuggingServer localhost:2525
 (defun talk-to-local-python ()
-  (esmtp::with-session '(:host "localhost"
+  (esmtp:with-session '(:host "localhost"
                          :port 2525
                          :trace t)
-    (esmtp::mail-from "me@example.com")
-    (esmtp::rcpt-to "you@example.com")
-    (esmtp::data '("From: Me <me@example.com>"
+    (esmtp:mail-from "me@example.com")
+    (esmtp:rcpt-to "you@example.com")
+    (esmtp:data '("From: Me <me@example.com>"
                    "To: You <you@example.com>"
                    "Subject: Test"
                    ""
