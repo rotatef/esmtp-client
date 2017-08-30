@@ -18,8 +18,8 @@
 (in-package #:cl-esmtp-client-tests)
 
 
-(defun talk-to-smtp-server (&key client mail-from rcpt-to data)
-  (esmtp::with-session (client :trace *trace-output*)
+(defun talk-to-smtp-server (&key settings mail-from rcpt-to data)
+  (esmtp::with-session settings
     (esmtp::mail-from mail-from)
     (esmtp::rcpt-to rcpt-to)
     (when data
@@ -29,10 +29,9 @@
 
 
 (defun talk-to-test.smtp.org ()
-  (talk-to-smtp-server :client (make-instance 'esmtp::client
-                                              :host "test.smtp.org"
-                                              :cl+ssl-options '(:verify nil)
-                                              :credentials '("user16" "pass16"))
+  (talk-to-smtp-server :settings '(:host "test.smtp.org"
+                                   :cl+ssl-options (:verify nil)
+                                   :credentials ("user16" "pass16"))
                        :mail-from ""
                        :rcpt-to "bit-bucket"
                        :data (flex:string-to-octets
@@ -50,11 +49,10 @@ Hello World.")))
         (lambda () "3d7550496f7a14")))
 
 (defun talk-to-mailtrap.io ()
-  (esmtp::with-session ((make-instance 'esmtp::client
-                                       :host "smtp.mailtrap.io"
-                                       :port 2525
-                                       :credentials *mailtrap.io-credentials*)
-                        :trace *trace-output*)
+  (esmtp::with-session (list :host "smtp.mailtrap.io"
+                             :port 2525
+                             :credentials *mailtrap.io-credentials*
+                             :trace *trace-output*)
     (esmtp::mail-from "me@example.com")
     (esmtp::rcpt-to "you@example.com")
     (esmtp::data '("From: Me <me@example.com>"
@@ -65,10 +63,9 @@ Hello World.")))
 
 
 (defun talk-to-gmail.com ()
-  (esmtp::with-session ((make-instance 'esmtp::client
-                                       :host "smtp.gmail.com"
-                                       :ssl t)
-                        :trace *trace-output*)
+  (esmtp::with-session (list :host "smtp.gmail.com"
+                             :ssl t
+                             :trace *trace-output*)
     (esmtp::send-command 250 "NOOP")
     (esmtp::send-command 250 "RSET")
     (esmtp::send-command 252 "VRFY postmaster")
@@ -77,10 +74,9 @@ Hello World.")))
 
 ;; python -m smtpd -n -c DebuggingServer localhost:2525
 (defun talk-to-local-python ()
-  (esmtp::with-session ((make-instance 'esmtp::client
-                                       :host "localhost"
-                                       :port 2525)
-                        :trace t)
+  (esmtp::with-session '(:host "localhost"
+                         :port 2525
+                         :trace t)
     (esmtp::mail-from "me@example.com")
     (esmtp::rcpt-to "you@example.com")
     (esmtp::data '("From: Me <me@example.com>"

@@ -26,7 +26,7 @@
   ((session :initarg :session
             :reader session)
    (expected-reply-code :initarg :expected-reply-code
-               :reader expected-reply-code)
+                        :reader expected-reply-code)
    (reply-code :initarg :reply-code
                :reader reply-code)
    (command-line :initarg :command-line
@@ -51,14 +51,17 @@
   ())
 
 
-(defclass client ()
+(defclass settings ()
   ((host :initarg :host
-         :reader host)
+         :reader host
+         :initform nil)
    (port :initarg :port
          :reader port)
    (ssl :initarg :ssl
-        :reader ssl
-        :initform nil)
+        :reader sslp)
+   (starttls :initarg :starttls
+             :reader starttlsp
+             :initform t)
    (cl+ssl-options :initarg :cl+ssl-options
                    :reader cl+ssl-options
                    :initform nil)
@@ -67,20 +70,44 @@
                 :initform nil)
    (local-name :initarg :local-name
                :reader local-name
-               :initform (machine-instance))))
+               :initform (machine-instance))
+   (trace-function :initarg :trace-function
+                   :initarg :trace
+                   :accessor trace-function
+                   :initform nil)))
 
 
-(defmethod initialize-instance :after ((client client) &rest args)
+(defmethod initialize-instance :after ((settings settings) &rest args)
   (declare (ignore args))
-  (assert (slot-boundp client 'host) () "SMTP host name missing.")
-  (unless (slot-boundp client 'port)
-    (setf (slot-value client 'port) (if (ssl client) 465 587))))
-
+  (with-slots (host port trace-function ssl)
+      settings
+    (assert host () "SMTP host name missing.")
+    (let ((port-bound (slot-boundp settings 'port))
+          (ssl-bound (slot-boundp settings 'ssl)))
+      (cond ((and (not port-bound)
+                  (not ssl-bound))
+             (setf port 587)
+             (setf ssl nil))
+            ((and port-bound
+                  (not ssl-bound))
+             (setf ssl (= port 465)))
+            ((and (not port-bound)
+                  ssl-bound)
+             (setf port (if ssl 465 587)))))
+    (setf trace-function
+          (etypecase trace-function
+            (stream
+             (make-trace-to-stream trace-function))
+            ((member t)
+             (make-trace-to-stream *trace-output*))
+            (function
+             trace-function)
+            (null
+             nil)))))
 
 
 (defclass session ()
-  ((client :initarg :client
-           :reader client)
+  ((settings :initarg :settings)
    (binary-stream :initarg :binary-stream
                   :accessor binary-stream)
    (tls-stream :accessor tls-stream :initform nil)
@@ -89,21 +116,23 @@
    (greeting :accessor greeting)
    (hello-greeting :accessor hello-greeting)
    (extensions :accessor extensions
-             :initform nil)
-   (trace-function :initarg :trace-function
-                   :accessor trace-function)
+               :initform nil)
    (at-newline :initform t
                :accessor at-newline)
    (data-lines-count :accessor data-lines-count)
    (data-bytes-count :accessor data-bytes-count)))
 
 
+(defun settings ()
+  (slot-value *session* 'settings))
+
+
 (defvar *suppress-trace-column* nil)
 (defun trace-log (origin data)
-  (when (trace-function *session*)
+  (when (trace-function (settings))
     (when *suppress-trace-column*
       (setf data (fill (copy-seq data) #\* :start *suppress-trace-column*)))
-    (funcall (trace-function *session*) origin data)))
+    (funcall (trace-function (settings)) origin data)))
 
 
 (defun make-trace-to-stream (stream)
@@ -114,27 +143,16 @@
     (finish-output stream)))
 
 
-(defmacro with-session ((client &key trace) &body body)
-  `(do-with-session :client ,client
-                    :trace ,trace
-                    :function (lambda ()
-                                ,@body)))
+(defmacro with-session (settings &body body)
+  `(do-with-session ,settings (lambda () ,@body)))
 
 
-(defun do-with-session (&key client function trace)
-  (usocket:with-client-socket (socket stream (host client) (port client)
-                                      :element-type '(unsigned-byte 8))
-    (let ((*session* (make-instance 'session
-                                    :client client
-                                    :trace-function (etypecase trace
-                                                      (stream
-                                                       (make-trace-to-stream trace))
-                                                      ((member t)
-                                                       (make-trace-to-stream *trace-output*))
-                                                      (function
-                                                       trace)
-                                                      (null
-                                                       nil)))))
+(defun do-with-session (settings function)
+  (let ((*session* (make-instance 'session :settings (apply #'make-instance 'settings settings))))
+    (usocket:with-client-socket (socket stream
+                                        (host (settings))
+                                        (port (settings))
+                                        :element-type '(unsigned-byte 8))
       (setup-session stream)
       (multiple-value-prog1 (funcall function)
         (quit)))))
@@ -142,7 +160,7 @@
 
 (defun setup-session (binary-stream)
   (setf (binary-stream *session*) binary-stream)
-  (if (ssl (client *session*))
+  (if (sslp (settings))
       (make-connection-secure)
       (setup-text-stream))
   (handshake))
@@ -151,8 +169,8 @@
 (defun make-connection-secure ()
   (setf (tls-stream *session*) (apply #'cl+ssl:make-ssl-client-stream
                                       (cl+ssl:stream-fd (binary-stream *session*))
-                                      `(,@(cl+ssl-options (client *session*))
-                                        :hostname ,(host (client *session*))
+                                      `(,@(cl+ssl-options (settings))
+                                        :hostname ,(host (settings))
                                         :verify :required)))
   (trace-log :i "TLS negotiation complete")
   (setup-text-stream))
@@ -268,14 +286,14 @@
 
 (defun ehlo ()
   (multiple-value-bind (ehlo-greeting ehlo-lines)
-      (send-command 250 "EHLO ~A" (local-name (client *session*)))
+      (send-command 250 "EHLO ~A" (local-name (settings)))
     (setf (hello-greeting *session*) ehlo-greeting)
     (setf (extensions *session*) (mapcar #'parse-ehlo-line ehlo-lines))))
 
 
 (defun helo ()
   (setf (hello-greeting *session*)
-        (send-command 250 "HELO ~A" (local-name (client *session*)))))
+        (send-command 250 "HELO ~A" (local-name (settings)))))
 
 
 (defun ehlo-or-helo ()
@@ -288,8 +306,9 @@
 
 
 (defun starttls ()
-  (when (and (extensionp :starttls)
-             (not (secure-connection-p)))
+  (when (and (starttlsp (settings))
+             (not (secure-connection-p))
+             (extensionp :starttls))
     (send-command 220 "STARTTLS")
     (make-connection-secure)
     (ehlo-or-helo)))
@@ -311,7 +330,7 @@
 
 
 (defun authenticate ()
-  (when (credentials (client *session*))
+  (when (credentials (settings))
     (let* ((supported-mechanisms '(:plain :login))
            (usable-mechanisms (intersection supported-mechanisms (extensionp :auth))))
       (unless usable-mechanisms
@@ -331,7 +350,7 @@
 
 
 (defun auth-plain ()
-  (let* ((credentials (unwrap-secret (credentials (client *session*))))
+  (let* ((credentials (unwrap-secret (credentials (settings))))
          (username (unwrap-secret (first credentials)))
          (password (unwrap-secret (second credentials))))
     (let ((*suppress-trace-column* 11))
@@ -346,7 +365,7 @@
 
 
 (defun auth-login ()
-  (let* ((credentials (unwrap-secret (credentials (client *session*))))
+  (let* ((credentials (unwrap-secret (credentials (settings))))
          (username (unwrap-secret (first credentials)))
          (password (unwrap-secret (second credentials))))
     (send-command 334 "AUTH LOGIN")
