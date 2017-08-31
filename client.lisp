@@ -94,8 +94,6 @@
             ((and (not port-bound)
                   ssl-bound)
              (setf port (if ssl 465 587)))))
-    (unless (or (null credentials) (functionp credentials))
-      (setf credentials (make-auth-function credentials)))
     (setf trace-function
           (etypecase trace-function
             (stream
@@ -190,6 +188,10 @@
   (setup-text-stream))
 
 
+(defun assert-secure-connection ()
+  (assert (secure-connection-p) () "Connection is not secure. Refusing to send password."))
+
+
 (defun setup-text-stream ()
   (setf (text-stream *session*)
         (flexi-streams:make-flexi-stream (or (tls-stream *session*)
@@ -267,13 +269,14 @@
          (args (if secret-data
                    (butlast args)
                    args))
-         (command (apply #'format nil format args)))
-    (trace-log :c (if secret-data
-                      (format nil "~A<secret data>" command)
-                      command))
+         (command (apply #'format nil format args))
+         (command-debug (if secret-data
+                            (format nil "~A<secret data>" command)
+                            command)))
+    (trace-log :c command-debug)
     (send-to-server command secret-data)
     (if expected-code
-        (check-reply command expected-code)
+        (check-reply command-debug expected-code)
         (read-reply))))
 
 
@@ -362,54 +365,86 @@
    (flex:string-to-octets string :external-format :utf-8)))
 
 
-(defun make-auth-function (credentials)
-  (lambda (stream mechanism &optional phase)
-    (ecase mechanism
-      (:plain
-       (princ (string-to-utf8-base64 (format nil "~A~C~A~C~A"
-                                             (first credentials)
-                                             #\null
-                                             (first credentials)
-                                             #\null
-                                             (second credentials)))
-              stream))
-      (:login
-       (ecase phase
-         (:username (princ (string-to-utf8-base64 (first credentials)) stream))
-         (:password (princ (string-to-utf8-base64 (second credentials)) stream)))))))
+(defparameter *supported-auth-mechanisms* '(:cram-md5 :plain :login))
+(defgeneric make-credentials-for (mechanism &key &allow-other-keys))
+(defgeneric auth-for (mechanism credentials-fn))
 
 
-(defun assert-secure-connection ()
-  (assert (secure-connection-p) () "Connection is not secure. Refusing to send password."))
+(defun make-credentials (&rest args &key username password)
+  (declare (ignore username password))
+  (list
+   *supported-auth-mechanisms*
+   (let ((handlers (loop for mechanism in *supported-auth-mechanisms*
+                         collect (cons mechanism (apply #'make-credentials-for mechanism args)))))
+     (lambda (stream mechanism &optional arg)
+       (funcall (cdr (assoc mechanism handlers)) stream arg)))))
+
+
+(defmethod make-credentials-for ((m (eql :cram-md5)) &key username password)
+  (lambda (stream &optional challenge)
+    (let* ((key (flex:string-to-octets password :external-format :utf-8))
+           (hmac (ironclad:make-hmac key :md5))
+           (digest (progn (ironclad:update-hmac hmac challenge)
+                          (ironclad:byte-array-to-hex-string (ironclad:hmac-digest hmac))))
+           (response (format nil "~A ~A" username digest))
+           (base64-response (esmtp::string-to-utf8-base64 response)))
+      (princ base64-response stream))))
+
+
+(defmethod auth-for ((m (eql :cram-md5)) credentials-fn)
+  (let* ((challenge-base64 (send-command 334 "AUTH CRAM-MD5"))
+         (challenge (base64:base64-string-to-usb8-array challenge-base64)))
+    (send-command 235 "" (lambda (stream)
+                           (funcall credentials-fn stream :cram-md5 challenge)))))
+
+
+(defmethod make-credentials-for ((m (eql :plain)) &key username password)
+  (lambda (stream &optional)
+    (princ (string-to-utf8-base64 (format nil "~A~C~A~C~A"
+                                             username
+                                             #\null
+                                             username
+                                             #\null
+                                             password))
+           stream)))
+
+
+(defmethod auth-for ((m (eql :plain)) credentials-fn)
+  (assert-secure-connection)
+  (send-command 235 "AUTH PLAIN "
+                (lambda (stream)
+                  (funcall credentials-fn stream :plain))))
+
+
+(defmethod make-credentials-for ((m (eql :login)) &key username password)
+  (lambda (stream &optional phase)
+    (ecase phase
+     (:username (princ (string-to-utf8-base64 username) stream))
+     (:password (princ (string-to-utf8-base64 password) stream)))))
+
+
+(defmethod auth-for ((m (eql :login)) credentials-fn)
+  (assert-secure-connection)
+  (send-command 334 "AUTH LOGIN")
+  (send-command 334 "" (lambda (stream)
+                         (funcall credentials-fn stream :login :username)))
+  (send-command 235 "" (lambda (stream)
+                         (funcall credentials-fn stream :login :password))))
 
 
 (defun authenticate ()
   (when (credentials (settings))
-    (let* ((supported-mechanisms '(:plain :login))
-           (usable-mechanisms (intersection supported-mechanisms (extensionp :auth))))
-      (unless usable-mechanisms
-        (error "Unable to authentciate, no common supported mechanism.~%Client supports: ~S~%Server supports: ~S"
-               supported-mechanisms (extensionp :auth)))
-      (cond ((member :plain usable-mechanisms)
-             (auth-plain))
-            ((member :login usable-mechanisms)
-             (auth-login))))))
-
-
-(defun auth-plain ()
-  (assert-secure-connection)
-  (send-command 235 "AUTH PLAIN "
-                (lambda (stream)
-                  (funcall (credentials (settings)) stream :plain))))
-
-
-(defun auth-login ()
-  (assert-secure-connection)
-  (send-command 334 "AUTH LOGIN")
-  (send-command 334 "" (lambda (stream)
-                         (funcall (credentials (settings)) stream :login :username)))
-  (send-command 235 "" (lambda (stream)
-                         (funcall (credentials (settings)) stream :login :password))))
+    (destructuring-bind (credential-mechanisms credentials-fn)
+        (credentials (settings))
+      (let ((usable-mechanisms (intersection *supported-auth-mechanisms* (intersection credential-mechanisms (extensionp :auth)))))
+        (unless usable-mechanisms
+          (error "Unable to authentciate, no common supported mechanism.~%Server supports: ~S~%Library supports: ~S~%Credentials support: ~S"
+                 (extensionp :auth)
+                 *supported-auth-mechanisms*
+                 credential-mechanisms))
+        (loop for mechanism in credential-mechanisms
+              when (member mechanism usable-mechanisms)
+                do (return (auth-for mechanism credentials-fn)))))))
 
 
 (defun data-start ()

@@ -19,16 +19,17 @@
   (:nicknames #:esmtp)
   (:use :common-lisp)
   (:export
-   #:extensionp
-   #:extensions
    #:data
    #:data-end
    #:data-bytes
    #:data-line
    #:data-start
+   #:extensionp
+   #:extensions
    #:hello-greeting
    #:greeting
    #:mail-from
+   #:make-credentials
    #:max-size
    #:noop
    #:permanent-error

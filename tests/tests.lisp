@@ -29,9 +29,10 @@
 
 
 (defun talk-to-test.smtp.org ()
-  (talk-to-smtp-server :settings '(:host "test.smtp.org"
-                                   :cl+ssl-options (:verify nil)
-                                   :credentials ("user16" "pass16"))
+  (talk-to-smtp-server :settings (list :host "test.smtp.org"
+                                       :cl+ssl-options '(:verify nil)
+                                       :credentials (esmtp:make-credentials :username "user16" :password "pass16")
+                                       :trace *trace-output*)
                        :mail-from ""
                        :rcpt-to "bit-bucket"
                        :data (flex:string-to-octets
@@ -45,8 +46,8 @@ Hello World.")))
 (defparameter *mailtrap.io-credentials*
   ;; All mail sent using these credentials are discarded by mailtrap.io.
   ;; Exposing them is unlikely to allow for any misuse.
-  (list "479a48b137b928"
-        "3d7550496f7a14"))
+  (esmtp:make-credentials :username "479a48b137b928"
+                          :password "3d7550496f7a14"))
 
 
 (defun talk-to-mailtrap.io ()
