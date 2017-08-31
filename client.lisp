@@ -79,7 +79,7 @@
 
 (defmethod initialize-instance :after ((settings settings) &rest args)
   (declare (ignore args))
-  (with-slots (host port trace-function ssl)
+  (with-slots (host port credentials trace-function ssl)
       settings
     (assert host () "SMTP host name missing.")
     (let ((port-bound (slot-boundp settings 'port))
@@ -94,6 +94,8 @@
             ((and (not port-bound)
                   ssl-bound)
              (setf port (if ssl 465 587)))))
+    (unless (or (null credentials) (functionp credentials))
+      (setf credentials (make-auth-function credentials)))
     (setf trace-function
           (etypecase trace-function
             (stream
@@ -142,11 +144,8 @@
   (slot-value *session* 'settings))
 
 
-(defvar *suppress-trace-column* nil)
 (defun trace-log (origin data)
   (when (trace-function (settings))
-    (when *suppress-trace-column*
-      (setf data (fill (copy-seq data) #\* :start *suppress-trace-column*)))
     (funcall (trace-function (settings)) origin data)))
 
 
@@ -221,8 +220,7 @@
          for text = (if long (subseq line 4) "")
          collect line into raw-lines
          collect text into texts
-         do (let ((*suppress-trace-column* nil))
-              (trace-log :s line))
+         do (trace-log :s line)
          while (and code more)
          finally (return (list code (first texts) (rest texts) raw-lines)))))
 
@@ -253,16 +251,27 @@
        (every #'valid-char-p line)))
 
 
-(defun send-to-server (line)
+(defun send-to-server (line &optional secret-data)
   (assert (valid-line-p line) () "The line contains invalid characters or is too long: ~S" line)
-  (write-line line (text-stream *session*))
+  (princ line (text-stream *session*))
+  (when secret-data
+    (funcall secret-data (text-stream *session*)))
+  (terpri (text-stream *session*))
   (finish-output (text-stream *session*)))
 
 
 (defun send-command (expected-code format &rest args)
-  (let ((command (apply #'format nil format args)))
-    (trace-log :c command)
-    (send-to-server command)
+  (let* ((last-arg (car (last args)))
+         (secret-data (when (functionp last-arg)
+                        last-arg))
+         (args (if secret-data
+                   (butlast args)
+                   args))
+         (command (apply #'format nil format args)))
+    (trace-log :c (if secret-data
+                      (format nil "~A<secret data>" command)
+                      command))
+    (send-to-server command secret-data)
     (if expected-code
         (check-reply command expected-code)
         (read-reply))))
@@ -353,6 +362,27 @@
    (flex:string-to-octets string :external-format :utf-8)))
 
 
+(defun make-auth-function (credentials)
+  (lambda (stream mechanism &optional phase)
+    (ecase mechanism
+      (:plain
+       (princ (string-to-utf8-base64 (format nil "~A~C~A~C~A"
+                                             (first credentials)
+                                             #\null
+                                             (first credentials)
+                                             #\null
+                                             (second credentials)))
+              stream))
+      (:login
+       (ecase phase
+         (:username (princ (string-to-utf8-base64 (first credentials)) stream))
+         (:password (princ (string-to-utf8-base64 (second credentials)) stream)))))))
+
+
+(defun assert-secure-connection ()
+  (assert (secure-connection-p) () "Connection is not secure. Refusing to send password."))
+
+
 (defun authenticate ()
   (when (credentials (settings))
     (let* ((supported-mechanisms '(:plain :login))
@@ -360,42 +390,26 @@
       (unless usable-mechanisms
         (error "Unable to authentciate, no common supported mechanism.~%Client supports: ~S~%Server supports: ~S"
                supported-mechanisms (extensionp :auth)))
-      (assert (secure-connection-p) () "Connection is not secure. Refusing to send password.")
       (cond ((member :plain usable-mechanisms)
              (auth-plain))
             ((member :login usable-mechanisms)
              (auth-login))))))
 
 
-(defun unwrap-secret (secret)
-  (if (functionp secret)
-      (funcall secret)
-      secret))
-
-
 (defun auth-plain ()
-  (let* ((credentials (unwrap-secret (credentials (settings))))
-         (username (unwrap-secret (first credentials)))
-         (password (unwrap-secret (second credentials))))
-    (let ((*suppress-trace-column* 11))
-      (send-command 235 "AUTH PLAIN ~A"
-                    (string-to-utf8-base64
-                     (format nil "~A~C~A~C~A"
-                             username
-                             #\null
-                             username
-                             #\null
-                             password))))))
+  (assert-secure-connection)
+  (send-command 235 "AUTH PLAIN "
+                (lambda (stream)
+                  (funcall (credentials (settings)) stream :plain))))
 
 
 (defun auth-login ()
-  (let* ((credentials (unwrap-secret (credentials (settings))))
-         (username (unwrap-secret (first credentials)))
-         (password (unwrap-secret (second credentials))))
-    (send-command 334 "AUTH LOGIN")
-    (let ((*suppress-trace-column* 0))
-      (send-command 334 (string-to-utf8-base64 username))
-      (send-command 235 (string-to-utf8-base64 password)))))
+  (assert-secure-connection)
+  (send-command 334 "AUTH LOGIN")
+  (send-command 334 "" (lambda (stream)
+                         (funcall (credentials (settings)) stream :login :username)))
+  (send-command 235 "" (lambda (stream)
+                         (funcall (credentials (settings)) stream :login :password))))
 
 
 (defun data-start ()
