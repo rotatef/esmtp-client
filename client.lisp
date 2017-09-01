@@ -365,7 +365,7 @@
    (flex:string-to-octets string :external-format :utf-8)))
 
 
-(defparameter *supported-auth-mechanisms* '(:cram-md5 :plain :login))
+(defparameter *supported-auth-mechanisms* '(:cram-md5 :plain :login :xoauth2))
 (defgeneric make-credentials-for (mechanism &key &allow-other-keys))
 (defgeneric auth-for (mechanism credentials-fn))
 
@@ -375,7 +375,9 @@
   (list
    *supported-auth-mechanisms*
    (let ((handlers (loop for mechanism in *supported-auth-mechanisms*
-                         collect (cons mechanism (apply #'make-credentials-for mechanism args)))))
+                         for handler = (apply #'make-credentials-for mechanism args)
+                         when handler
+                           collect (cons mechanism handler))))
      (lambda (stream mechanism &optional arg)
        (funcall (cdr (assoc mechanism handlers)) stream arg)))))
 
@@ -387,7 +389,7 @@
            (digest (progn (ironclad:update-hmac hmac challenge)
                           (ironclad:byte-array-to-hex-string (ironclad:hmac-digest hmac))))
            (response (format nil "~A ~A" username digest))
-           (base64-response (esmtp::string-to-utf8-base64 response)))
+           (base64-response (string-to-utf8-base64 response)))
       (princ base64-response stream))))
 
 
@@ -398,15 +400,18 @@
                            (funcall credentials-fn stream :cram-md5 challenge)))))
 
 
+(defun auth-plain-message (username password)
+  (string-to-base64 (format nil "~A~C~A~C~A"
+                            username
+                            #\null
+                            username
+                            #\null
+                            password)))
+
+
 (defmethod make-credentials-for ((m (eql :plain)) &key username password)
   (lambda (stream &optional)
-    (princ (string-to-utf8-base64 (format nil "~A~C~A~C~A"
-                                             username
-                                             #\null
-                                             username
-                                             #\null
-                                             password))
-           stream)))
+    (princ (auth-plain-message username password) stream)))
 
 
 (defmethod auth-for ((m (eql :plain)) credentials-fn)
@@ -419,8 +424,8 @@
 (defmethod make-credentials-for ((m (eql :login)) &key username password)
   (lambda (stream &optional phase)
     (ecase phase
-     (:username (princ (string-to-utf8-base64 username) stream))
-     (:password (princ (string-to-utf8-base64 password) stream)))))
+      (:username (princ (string-to-utf8-base64 username) stream))
+      (:password (princ (string-to-utf8-base64 password) stream)))))
 
 
 (defmethod auth-for ((m (eql :login)) credentials-fn)
@@ -430,6 +435,16 @@
                          (funcall credentials-fn stream :login :username)))
   (send-command 235 "" (lambda (stream)
                          (funcall credentials-fn stream :login :password))))
+
+
+(defmethod make-credentials-for ((m (eql :xoauth2)) &key))
+
+
+(defmethod auth-for ((m (eql :xoauth2)) credentials-fn)
+  (assert-secure-connection)
+  (send-command 235 "AUTH XOAUTH2 "
+                (lambda (stream)
+                  (funcall credentials-fn stream :xoauth2))))
 
 
 (defun authenticate ()

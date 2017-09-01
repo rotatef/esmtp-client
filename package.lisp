@@ -19,6 +19,7 @@
   (:nicknames #:esmtp)
   (:use :common-lisp)
   (:export
+   #:auth-plain-message
    #:data
    #:data-end
    #:data-bytes
