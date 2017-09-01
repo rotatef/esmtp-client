@@ -15,12 +15,18 @@
 ;;;;  You should have received a copy of the GNU General Public License
 ;;;;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-(defsystem #:cl-esmtp-client-tests
-  :name "cl-esmtp-client-tests"
-  :licence "GNU Lesser General Public Licence 3.0"
-  :author "Thomas Bakketun <thomas.bakketun@copyleft.no>"
-  :description "Tests for cl-stmp-submitter"
-  :depends-on (:cl-esmtp-client-cram-md5)
-  :serial t
-  :components ((:file "package")
-               (:file "tests")))
+
+(in-package #:cl-esmtp-client)
+
+
+(defmethod make-credentials-for ((m (eql :xoauth2)) &key))
+
+
+(defmethod auth-for ((m (eql :xoauth2)) credentials-fn)
+  (assert-secure-connection)
+  (send-command 235 "AUTH XOAUTH2 "
+                (lambda (stream)
+                  (funcall credentials-fn stream :xoauth2))))
+
+
+(register-auth-mechanism :xoauth2)

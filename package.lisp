@@ -19,6 +19,7 @@
   (:nicknames #:esmtp)
   (:use :common-lisp)
   (:export
+   #:auth-for
    #:auth-plain-message
    #:data
    #:data-end
@@ -31,13 +32,16 @@
    #:greeting
    #:mail-from
    #:make-credentials
+   #:make-credentials-for
    #:max-size
    #:noop
    #:permanent-error
    #:protocol-error
+   #:register-auth-mechanism
    #:rcpt-to
    #:rset
    #:send-command
+   #:string-to-utf8-base64
    #:transient-error
    #:with-session
    ))

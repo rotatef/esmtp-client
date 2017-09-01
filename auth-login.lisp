@@ -15,12 +15,24 @@
 ;;;;  You should have received a copy of the GNU General Public License
 ;;;;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-(defsystem #:cl-esmtp-client-tests
-  :name "cl-esmtp-client-tests"
-  :licence "GNU Lesser General Public Licence 3.0"
-  :author "Thomas Bakketun <thomas.bakketun@copyleft.no>"
-  :description "Tests for cl-stmp-submitter"
-  :depends-on (:cl-esmtp-client-cram-md5)
-  :serial t
-  :components ((:file "package")
-               (:file "tests")))
+
+(in-package #:cl-esmtp-client)
+
+
+(defmethod make-credentials-for ((m (eql :login)) &key username password)
+  (lambda (stream phase)
+    (ecase phase
+      (:username (princ (string-to-utf8-base64 username) stream))
+      (:password (princ (string-to-utf8-base64 password) stream)))))
+
+
+(defmethod auth-for ((m (eql :login)) credentials-fn)
+  (assert-secure-connection)
+  (send-command 334 "AUTH LOGIN")
+  (send-command 334 "" (lambda (stream)
+                         (funcall credentials-fn stream :username)))
+  (send-command 235 "" (lambda (stream)
+                         (funcall credentials-fn stream :password))))
+
+
+(register-auth-mechanism :login :quality 0.5)

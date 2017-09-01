@@ -365,101 +365,44 @@
    (flex:string-to-octets string :external-format :utf-8)))
 
 
-(defparameter *supported-auth-mechanisms* '(:cram-md5 :plain :login :xoauth2))
+(defvar *supported-auth-mechanisms* nil)
 (defgeneric make-credentials-for (mechanism &key &allow-other-keys))
 (defgeneric auth-for (mechanism credentials-fn))
 
 
+(defun register-auth-mechanism (name &key (quality 1))
+  (setf *supported-auth-mechanisms*
+        (sort (remove-duplicates (cons (cons name quality)
+                                       *supported-auth-mechanisms*)
+                                 :key #'car
+                                 :from-end t)
+              #'>
+              :key #'cdr)))
+
+
 (defun make-credentials (&rest args &key username password)
   (declare (ignore username password))
-  (list
-   *supported-auth-mechanisms*
-   (let ((handlers (loop for mechanism in *supported-auth-mechanisms*
-                         for handler = (apply #'make-credentials-for mechanism args)
-                         when handler
-                           collect (cons mechanism handler))))
-     (lambda (stream mechanism &optional arg)
-       (funcall (cdr (assoc mechanism handlers)) stream arg)))))
-
-
-(defmethod make-credentials-for ((m (eql :cram-md5)) &key username password)
-  (lambda (stream &optional challenge)
-    (let* ((key (flex:string-to-octets password :external-format :utf-8))
-           (hmac (ironclad:make-hmac key :md5))
-           (digest (progn (ironclad:update-hmac hmac challenge)
-                          (ironclad:byte-array-to-hex-string (ironclad:hmac-digest hmac))))
-           (response (format nil "~A ~A" username digest))
-           (base64-response (string-to-utf8-base64 response)))
-      (princ base64-response stream))))
-
-
-(defmethod auth-for ((m (eql :cram-md5)) credentials-fn)
-  (let* ((challenge-base64 (send-command 334 "AUTH CRAM-MD5"))
-         (challenge (base64:base64-string-to-usb8-array challenge-base64)))
-    (send-command 235 "" (lambda (stream)
-                           (funcall credentials-fn stream :cram-md5 challenge)))))
-
-
-(defun auth-plain-message (username password)
-  (string-to-base64 (format nil "~A~C~A~C~A"
-                            username
-                            #\null
-                            username
-                            #\null
-                            password)))
-
-
-(defmethod make-credentials-for ((m (eql :plain)) &key username password)
-  (lambda (stream &optional)
-    (princ (auth-plain-message username password) stream)))
-
-
-(defmethod auth-for ((m (eql :plain)) credentials-fn)
-  (assert-secure-connection)
-  (send-command 235 "AUTH PLAIN "
-                (lambda (stream)
-                  (funcall credentials-fn stream :plain))))
-
-
-(defmethod make-credentials-for ((m (eql :login)) &key username password)
-  (lambda (stream &optional phase)
-    (ecase phase
-      (:username (princ (string-to-utf8-base64 username) stream))
-      (:password (princ (string-to-utf8-base64 password) stream)))))
-
-
-(defmethod auth-for ((m (eql :login)) credentials-fn)
-  (assert-secure-connection)
-  (send-command 334 "AUTH LOGIN")
-  (send-command 334 "" (lambda (stream)
-                         (funcall credentials-fn stream :login :username)))
-  (send-command 235 "" (lambda (stream)
-                         (funcall credentials-fn stream :login :password))))
-
-
-(defmethod make-credentials-for ((m (eql :xoauth2)) &key))
-
-
-(defmethod auth-for ((m (eql :xoauth2)) credentials-fn)
-  (assert-secure-connection)
-  (send-command 235 "AUTH XOAUTH2 "
-                (lambda (stream)
-                  (funcall credentials-fn stream :xoauth2))))
+  (loop for (mechanism . quality) in *supported-auth-mechanisms*
+        for handler = (apply #'make-credentials-for mechanism args)
+        when handler
+          collect (cons mechanism handler)))
 
 
 (defun authenticate ()
   (when (credentials (settings))
-    (destructuring-bind (credential-mechanisms credentials-fn)
-        (credentials (settings))
-      (let ((usable-mechanisms (intersection *supported-auth-mechanisms* (intersection credential-mechanisms (extensionp :auth)))))
-        (unless usable-mechanisms
-          (error "Unable to authentciate, no common supported mechanism.~%Server supports: ~S~%Library supports: ~S~%Credentials support: ~S"
-                 (extensionp :auth)
-                 *supported-auth-mechanisms*
-                 credential-mechanisms))
-        (loop for mechanism in credential-mechanisms
-              when (member mechanism usable-mechanisms)
-                do (return (auth-for mechanism credentials-fn)))))))
+    (let* ((supported-mechanisms (mapcar #'car *supported-auth-mechanisms*))
+           (credential-mechanisms (mapcar #'car (credentials (settings))))
+           (usable-mechanisms (intersection supported-mechanisms
+                                            (intersection credential-mechanisms
+                                                          (extensionp :auth)))))
+      (unless usable-mechanisms
+        (error "Unable to authentciate, no common supported mechanism.~%Server supports: ~S~%Library supports: ~S~%Credentials support: ~S"
+               (extensionp :auth)
+               *supported-auth-mechanisms*
+               credential-mechanisms))
+      (loop for (mechanism . credentials-fn) in (credentials (settings))
+            when (member mechanism usable-mechanisms)
+              do (return (auth-for mechanism credentials-fn))))))
 
 
 (defun data-start ()

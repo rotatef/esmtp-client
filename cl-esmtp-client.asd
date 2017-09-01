@@ -22,8 +22,10 @@
   :description "A library for sending email via SMTP according to RFC 6409."
   :depends-on (:cl-base64
                :cl+ssl
-               :ironclad
                :usocket)
   :serial t
   :components ((:file "package")
-               (:file "client")))
+               (:file "client")
+               (:file "auth-plain")
+               (:file "auth-login")
+               (:file "auth-xoauth2")))
