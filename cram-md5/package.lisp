@@ -18,4 +18,4 @@
 (defpackage #:cl-esmtp-client-cram-md5
   (:use :common-lisp)
   (:export
-   ))
+   #:auth-cram-md5-message))

@@ -19,22 +19,24 @@
 (in-package #:cl-esmtp-client-cram-md5)
 
 
+(defun auth-cram-md5-message (challenge username password)
+  (let* ((key (flex:string-to-octets password :external-format :utf-8))
+         (hmac (ironclad:make-hmac key :md5))
+         (digest (progn (ironclad:update-hmac hmac challenge)
+                        (ironclad:byte-array-to-hex-string (ironclad:hmac-digest hmac))))
+         (response (format nil "~A ~A" username digest)))
+    (esmtp:string-to-utf8-base64 response)))
+
+
 (defmethod esmtp:make-credentials-for ((m (eql :cram-md5)) &key username password)
-  (lambda (stream &optional challenge)
-    (let* ((key (flex:string-to-octets password :external-format :utf-8))
-           (hmac (ironclad:make-hmac key :md5))
-           (digest (progn (ironclad:update-hmac hmac challenge)
-                          (ironclad:byte-array-to-hex-string (ironclad:hmac-digest hmac))))
-           (response (format nil "~A ~A" username digest))
-           (base64-response (esmtp:string-to-utf8-base64 response)))
-      (princ base64-response stream))))
+  (lambda (challenge)
+    (auth-cram-md5-message challenge username password)))
 
 
 (defmethod esmtp:auth-for ((m (eql :cram-md5)) credentials-fn)
   (let* ((challenge-base64 (esmtp:send-command 334 "AUTH CRAM-MD5"))
          (challenge (base64:base64-string-to-usb8-array challenge-base64)))
-    (esmtp:send-command 235 "" (lambda (stream)
-                                 (funcall credentials-fn stream challenge)))))
+    (esmtp:send-command 235 "~A" (funcall credentials-fn challenge))))
 
 
 (esmtp:register-auth-mechanism :cram-md5 :quality 1.5)
