@@ -156,6 +156,31 @@
 
 
 (defmacro with-session (settings &body body)
+  "Opens a connetion to an SMTP server, executes the body, closes the connection.
+
+The settings form is evaluated and should return a property list:
+
+:host - The SMTP server hostname as a string.
+:port - The TCP/IP port of the SMTP server.
+  Default is 587 or 465 if :ssl is true.
+:ssl - Establish encrypted SSL/TLS connection immediately.
+  Default value is true if port is 465, otherwise false.
+:starttls - Establish encrypted SSL/TLS connection using the STARTTLS command.
+  Starttls is only used if the server supports it and the connection in not already encrypted.
+  Default is true.
+:cl+ssl-options - These options are forwared to cl+ssl:make-ssl-client-stream.
+:credentials - Specifies login details. See make-credentials.
+:local-name - The hostname used in HELO/EHLO commands.
+:trace - Enables tracing of the communcation. One of:
+  nil - No trace, the default
+  t - Trace to *trace-output*
+  character stream - Trace to that stream.
+  function - A function taking two parameters origin and string. Origin is a keyword:
+    :S - Data sent from the server
+    :C - Data sent by the client
+    :I - Internal event (eg. "TLS negotiation complete")
+
+  Some data is not traced, secret data (passwords) and the message data."
   `(do-with-session ,settings (lambda () ,@body)))
 
 
@@ -450,27 +475,27 @@
   (send-command 250 "."))
 
 
-(defun data (lines)
+(defun data (data)
+  "Send the mail message to the server. Returns server response message. This will often include
+a local id of assinged to message.
+
+The data object can be:
+A string - Each line is separated by #\Linefeed or #\Return, #\Linefeed.
+An octet vector - Lines should be separated by CRLF.
+A list of strings - Each string is one line of the message.
+
+Dots are automatically escaped by the library.
+Lines should not be longer than 998 characters."
   (data-start)
-  (dolist (line lines)
-    (data-line line))
+  (etypecase data
+    (list
+     (dolist (line data)
+       (data-line line)))
+    ((vector (unsigned-byte 8))
+     (data-bytes data))
+    (string
+     (with-input-from-string (in data)
+       (loop for line = (read-line in nil)
+             while line
+             do (data (string-trim '(#\Return) line))))))
   (data-end))
-
-
-(defun string-to-lines (data)
-  (with-input-from-string (in data)
-    (loop for line = (read-line in nil)
-          while line
-          collect (string-trim '(#\Return) line))))
-
-
-(defun send-mail (mail-from rcpt-to data)
-  (let* ((lines (string-to-lines data))
-         (size (+ (reduce #'+ (mapcar #'length lines))
-                  (* 2 (length lines)))))
-    (mail-from mail-from :size size)
-    (if (listp rcpt-to)
-        (dolist (rcpt rcpt-to)
-          (rcpt-to rcpt))
-        (rcpt-to rcpt-to))
-    (data lines)))

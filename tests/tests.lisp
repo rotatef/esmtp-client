@@ -18,29 +18,19 @@
 (in-package #:cl-esmtp-client-tests)
 
 
-(defun talk-to-smtp-server (&key settings mail-from rcpt-to data)
-  (esmtp:with-session settings
-    (esmtp:mail-from mail-from)
-    (esmtp:rcpt-to rcpt-to)
-    (when data
-      (esmtp:data-start)
-      (esmtp:data-bytes data)
-      (esmtp:data-end))))
-
-
 (defun talk-to-test.smtp.org ()
-  (talk-to-smtp-server :settings (list :host "test.smtp.org"
-                                       :cl+ssl-options '(:verify nil)
-                                       :credentials (esmtp:make-credentials :username "user16" :password "pass16")
-                                       :trace *trace-output*)
-                       :mail-from ""
-                       :rcpt-to "bit-bucket"
-                       :data (flex:string-to-octets
-"From: Me <me@example.com>
+  (esmtp:with-session (list :host "test.smtp.org"
+                            :cl+ssl-options '(:verify nil)
+                            :credentials (esmtp:make-credentials :username "user16" :password "pass16")
+                            :trace *trace-output*)
+    (esmtp:mail-from "me@example.com")
+    (esmtp:rcpt-to "bit-bucket")
+    (esmtp:data (flex:string-to-octets
+                       "From: Me <me@example.com>
 To: You <you@example.com>
 Subject: Test
 
-Hello World.")))
+Hello World."))))
 
 
 (defparameter *mailtrap.io-credentials*
