@@ -178,7 +178,7 @@ The settings form is evaluated and should return a property list:
   function - A function taking two parameters origin and string. Origin is a keyword:
     :S - Data sent from the server
     :C - Data sent by the client
-    :I - Internal event (eg. "TLS negotiation complete")
+    :I - Internal event (eg. TLS negotiation complete)
 
   Some data is not traced, secret data (passwords) and the message data."
   `(do-with-session ,settings (lambda () ,@body)))
