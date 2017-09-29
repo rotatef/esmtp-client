@@ -24,9 +24,13 @@
 
 (defmethod auth-for ((m (eql :xoauth2)) credentials-fn)
   (assert-secure-connection)
-  (send-command 235 "AUTH XOAUTH2 "
-                (lambda (stream)
-                  (funcall credentials-fn stream :xoauth2))))
+  (multiple-value-bind (code first-line)
+      (send-command '(235 334) "AUTH XOAUTH2 "
+                    (lambda (stream)
+                      (funcall credentials-fn stream)))
+    (when (eql code 334)
+      (error 'client-error :session *session*
+                           :message (format nil "XOAUTH2: ~A" (base64:base64-string-to-string first-line))))))
 
 
 (register-auth-mechanism :xoauth2)

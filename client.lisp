@@ -22,10 +22,19 @@
 (defvar *session*)
 
 
-(define-condition protocol-error (error)
+(define-condition client-error (error)
   ((session :initarg :session
             :reader session)
-   (expected-reply-code :initarg :expected-reply-code
+   (message :initarg :message
+            :reader message))
+  (:report (lambda (condition stream)
+             (print-unreadable-object (condition stream :type t)
+               (format stream "ESTMP error: ~A"
+                       (message condition))))))
+
+
+(define-condition protocol-error (client-error)
+  ((expected-reply-code :initarg :expected-reply-code
                         :reader expected-reply-code)
    (reply-code :initarg :reply-code
                :reader reply-code)
@@ -255,7 +264,9 @@ The settings form is evaluated and should return a property list:
 (defun check-reply (command-line expected-code)
   (multiple-value-bind (code first-line rest-lines raw-lines)
       (read-reply)
-    (unless (eql code expected-code)
+    (unless (if (listp expected-code)
+                (member code expected-code)
+                (eql code expected-code))
       (error (if (and (integerp code)
                       (= 4 (floor code 100)))
                  'transient-error
@@ -265,7 +276,9 @@ The settings form is evaluated and should return a property list:
              :expected-reply-code expected-code
              :command-line command-line
              :reply-lines raw-lines))
-    (values first-line rest-lines)))
+    (if (listp expected-code)
+        (values code first-line rest-lines)
+        (values first-line rest-lines))))
 
 
 (defun valid-char-p (char)

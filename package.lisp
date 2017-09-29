@@ -21,6 +21,7 @@
   (:export
    #:auth-for
    #:auth-plain-message
+   #:client-error
    #:data
    #:data-end
    #:data-bytes
