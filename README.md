@@ -2,4 +2,4 @@
 
 cl-esmtp-client is a Common Lisp library for sending email via SMTP according to RFC 6409.
 
-Homepage: https://github.com/copyleft/cl-esmtp-client
+Homepage: https://github.com/y-or-n-p/cl-esmtp-client
