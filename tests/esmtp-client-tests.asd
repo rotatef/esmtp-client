@@ -1,4 +1,4 @@
-;;;;  cl-esmtp-client
+;;;;  esmtp-client
 ;;;;
 ;;;;  Copyright (C) 2017 Thomas Bakketun <thomas.bakketun@copyleft.no>
 ;;;;
@@ -15,12 +15,12 @@
 ;;;;  You should have received a copy of the GNU General Public License
 ;;;;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-(defsystem #:cl-esmtp-client-tests
-  :name "cl-esmtp-client-tests"
+(defsystem #:esmtp-client-tests
+  :name "esmtp-client-tests"
   :licence "GNU Lesser General Public Licence 3.0"
   :author "Thomas Bakketun <thomas.bakketun@copyleft.no>"
   :description "Tests for cl-stmp-submitter"
-  :depends-on (:cl-esmtp-client-cram-md5)
+  :depends-on (:esmtp-client-cram-md5)
   :serial t
   :components ((:file "package")
                (:file "tests")))

@@ -1,4 +1,4 @@
-;;;;  cl-esmtp-client
+;;;;  esmtp-client
 ;;;;
 ;;;;  Copyright (C) 2017 Thomas Bakketun <thomas.bakketun@copyleft.no>
 ;;;;
@@ -15,12 +15,12 @@
 ;;;;  You should have received a copy of the GNU General Public License
 ;;;;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-(defsystem #:cl-esmtp-client-cram-md5
-  :name "cl-esmtp-client-cram-md5"
+(defsystem #:esmtp-client-cram-md5
+  :name "esmtp-client-cram-md5"
   :licence "GNU Lesser General Public Licence 3.0"
   :author "Thomas Bakketun <thomas.bakketun@copyleft.no>"
-  :description "CRAM-MD5 authentication mechanism for cl-esmtp-client"
-  :depends-on (:cl-esmtp-client
+  :description "CRAM-MD5 authentication mechanism for esmtp-client"
+  :depends-on (:esmtp-client
                :cl-base64
                :ironclad)
   :serial t

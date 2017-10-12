@@ -1,4 +1,4 @@
-;;;;  cl-esmtp-client
+;;;;  esmtp-client
 ;;;;
 ;;;;  Copyright (C) 2017 Thomas Bakketun <thomas.bakketun@copyleft.no>
 ;;;;
@@ -16,7 +16,7 @@
 ;;;;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 
-(in-package #:cl-esmtp-client)
+(in-package #:esmtp-client)
 
 
 (defun auth-plain-message (username password)

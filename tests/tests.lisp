@@ -1,4 +1,4 @@
-;;;;  cl-esmtp-client
+;;;;  esmtp-client
 ;;;;
 ;;;;  Copyright (C) 2017 Thomas Bakketun <thomas.bakketun@copyleft.no>
 ;;;;
@@ -15,7 +15,7 @@
 ;;;;  You should have received a copy of the GNU General Public License
 ;;;;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-esmtp-client-tests)
+(in-package #:esmtp-client-tests)
 
 
 (defun talk-to-test.smtp.org ()

@@ -1,4 +1,4 @@
-;;;;  cl-esmtp-client
+;;;;  esmtp-client
 ;;;;
 ;;;;  Copyright (C) 2017 Thomas Bakketun <thomas.bakketun@copyleft.no>
 ;;;;
@@ -16,7 +16,7 @@
 ;;;;  along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 
-(in-package #:cl-esmtp-client-cram-md5)
+(in-package #:esmtp-client-cram-md5)
 
 
 (defun auth-cram-md5-message (challenge username password)
